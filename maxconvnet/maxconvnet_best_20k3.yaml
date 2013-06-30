@@ -1,0 +1,94 @@
+!obj:pylearn2.train.Train {
+    dataset: &train !obj:pento_data.Pentomino {
+        which_set: 'train',
+        names: "pento64x64_20k_64patches_seed_112168712_64patches.npy"
+    },
+    model: !obj:pylearn2.models.mlp.MLP {
+        batch_size: 64,
+        layers: [
+                 !obj:pylearn2.models.maxout.MaxoutConvC01B {
+                     layer_name: 'h0',
+                     tied_b: 1,
+                     num_channels: 16,
+                     num_pieces: 5,
+                     kernel_shape: [8, 8],
+                     pool_shape: [1, 1],
+                     pool_stride: [1, 1],
+                     irange: 0.005000,
+                 },
+                 !obj:pylearn2.models.maxout.MaxoutConvC01B {
+                     layer_name: 'h2',
+                     tied_b: 1,
+                     W_lr_scale: .6,
+                     b_lr_scale: .6,
+                     num_channels: 16,
+                     num_pieces: 5,
+                     kernel_shape: [6, 6],
+                     pool_shape: [1, 1],
+                     pool_stride: [1, 1],
+                     irange: 0.005000,
+                 },
+                 !obj:pylearn2.models.maxout.Maxout {
+                    layer_name: 'h3',
+                    irange: .005,
+                    num_units: 600,
+                    num_pieces: 4,
+                 },
+                 !obj:pylearn2.models.mlp.Softmax {
+                     max_col_norm: 1.9365,
+                     layer_name: 'y',
+                     n_classes: 2,
+                     irange: 0.005000
+                 }
+                ],
+        input_space: !obj:pylearn2.space.Conv2DSpace {
+            shape: [64, 64],
+            num_channels: 1,
+            axes: ['c', 0, 1, 'b'],
+        },
+    },
+    algorithm: !obj:pylearn2.training_algorithms.sgd.SGD {
+        train_iteration_mode: 'batchwise_shuffled_equential',
+        learning_rate: 0.026367,
+        init_momentum: .5,
+        monitoring_dataset:
+            {
+                'train' : *train,
+                'test' : !obj:pento_data.Pentomino {
+                              which_set: 'test',
+                              names: "pento64x64_10k_seed_23111298122_64patches.npy"
+                          },
+                'valid' : !obj:pento_data.Pentomino {
+                              which_set: 'valid',
+                              names: "pento64x64_40k_64patches_seed_975168712_64patches.npy",
+                              start: 0,
+                              stop: 10000
+                 }
+            },
+        termination_criterion: !obj:pylearn2.termination_criteria.MonitorBased {
+            channel_name: "valid_y_misclass",
+            prop_decrease: 0.,
+            N: 100
+        }
+    },
+    extensions: [
+        !obj:pylearn2.train_extensions.best_params.MonitorBasedSaveBest {
+             channel_name: 'valid_y_misclass',
+             # we save in joblib format becasue of large size of models
+             # could cause pickle to crash
+             save_path: "./maxconvnet_best_20k3.pkl",
+        },
+        !obj:pylearn2.training_algorithms.sgd.MomentumAdjustor {
+            start: 1,
+            saturate: 200,
+            final_momentum: .8
+        },
+        !obj:pylearn2.training_algorithms.sgd.LinearDecayOverEpoch {
+            start: 1,
+            saturate: 200,
+            decay_factor: 0.001000
+        },
+    ],
+    save_path: "maxconvnet_last_20k3.pkl",
+    save_freq: 2
+}
